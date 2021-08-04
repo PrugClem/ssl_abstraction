@@ -32,13 +32,20 @@
 *.app
 
 # visual studio directory
-.vs/*
-out/*
+.vs
+out
 CMakeSettings.json
 
-# exclude certificate files
+# vs code directories
+.vscode
+build
+
+# exclude generated certificate files, leave generating scripts in the directory
 crt/*
 !crt/generate_root_certificate.sh
 !crt/generate_user_certificate.sh
 !crt/delete_user_certificate.sh
 !crt/delete_root_certificate.sh
+
+# include certificate generator testing directory
+!crt/delete_test_certificate.sh

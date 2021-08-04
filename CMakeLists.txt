@@ -7,12 +7,16 @@ set(CMAKE_CXX_EXTENSIONS ON)
 
 project(ssl_client) 
 project(ssl_server)
+project(ssl_generator)
 
 # ssl_client sources
 add_executable(ssl_client "ssl_client.cpp")
 
 # ssl_server sources
 add_executable(ssl_server "ssl_server.cpp")
+
+# ssl generator sources
+add_executable(ssl_generator "ssl_generator.cpp" "ssl_key_pair.hpp")
 
 # copy certificates post-build
 add_custom_command(TARGET ssl_server POST_BUILD
@@ -27,6 +31,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(ssl_client PRIVATE Threads::Threads)
 target_link_libraries(ssl_server PRIVATE Threads::Threads)
 
-# libcrypto
+# libcrypto and ssl
 target_link_libraries(ssl_client PRIVATE crypto ssl)
 target_link_libraries(ssl_server PRIVATE crypto ssl)
+target_link_libraries(ssl_generator PRIVATE crypto ssl)
