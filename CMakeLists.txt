@@ -16,7 +16,7 @@ add_executable(ssl_client "ssl_client.cpp")
 add_executable(ssl_server "ssl_server.cpp")
 
 # ssl generator sources
-add_executable(ssl_generator "ssl_generator.cpp" "ssl_key_pair.hpp")
+add_executable(ssl_generator "ssl_generator.cpp" "ssl_abstraction.hpp" "ssl_key_pair.hpp" "ssl_crt_signing_request.hpp" "ssl_certificate.hpp" "ssl_defs.hpp")
 
 # copy certificates post-build
 add_custom_command(TARGET ssl_server POST_BUILD
