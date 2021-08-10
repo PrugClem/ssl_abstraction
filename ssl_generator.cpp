@@ -23,6 +23,14 @@ int main()
     ssl::crt_signing_request server_csr, client_csr;
     ssl::certificate root_crt, server_crt, client_crt;
 
+    ssl::certificate_subject server_subject, client_subject;
+    server_subject.country_name = client_subject.country_name = "AT";
+    server_subject.state_name = client_subject.state_name = "LA";
+    server_subject.locality_name = client_subject.locality_name = "VIE";
+    server_subject.organisation_name = client_subject.organisation_name = "Private";
+    server_subject.common_name = "server certificate";
+    client_subject.common_name = "client certificate";
+
     /*key.generate(2048, ec);
     std::cout << "key.generate(): " << ec.message() << std::endl;
 
@@ -46,7 +54,7 @@ int main()
     server_key.generate(2048, ec);
     std::cout << "server_key.generate(): " << ec.message() << std::endl; if (ec) { return -1; }
 
-    server_csr.create(server_key, ec);
+    server_csr.create(server_key, server_subject, ec);
     std::cout << "server_csr.generate(): " << ec.message() << std::endl; if (ec) { return -1; }
 
     server_crt.create_from_request(root_key, root_crt, server_csr, ssl::valid_now, ssl::valid_1_year, ec);
@@ -56,13 +64,13 @@ int main()
     client_key.generate(2048, ec);
     std::cout << "client_key.generate(): " << ec.message() << std::endl; if (ec) { return -1; }
 
-    client_csr.create(client_key, ec);
+    client_csr.create(client_key, client_subject, ec);
     std::cout << "client_csr.generate(): " << ec.message() << std::endl; if (ec) { return -1; }
 
     client_crt.create_from_request(root_key, root_crt, client_csr, ssl::valid_now, ssl::valid_1_year, ec);
     std::cout << "client.crt.generate_from_request(): " << ec.message() << std::endl; if (ec) { return -1; }
 
-    ssl::generate_dhparams("crt/dh4096.pem", 4096, ec);
+    //ssl::generate_dhparams("crt/dh4096.pem", 4096, 2, ec);
 
     // write keys and certificates to the respective files
     server_key.write_to_file("crt/server.key", ec);

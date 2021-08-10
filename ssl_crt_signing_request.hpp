@@ -70,16 +70,26 @@ namespace ssl
             fclose(file);
             return ec;
         }
-        std::error_code& create(ssl::key_pair& key, std::error_code& ec)
+        std::error_code& create(ssl::key_pair& key, const ssl::certificate_subject& subject, std::error_code& ec)
         {
             bool success;
+            X509_NAME *_subject;
 
             if (_csr != nullptr) X509_REQ_free(_csr);
+
+            _subject = X509_NAME_new();
+            if (!_subject)
+            {
+                ec.assign(ssl::error_enum::alloc_subject_struct, ssl::error_instance);
+                X509_NAME_free(_subject);
+                return ec;
+            }
 
             _csr = X509_REQ_new();
             if (!_csr)
             {
                 ec.assign(ssl::error_enum::alloc_signing_struct, ssl::error_instance);
+                X509_NAME_free(_subject);
                 return ec;
             }
 
@@ -87,6 +97,24 @@ namespace ssl
             if (!success)
             {
                 ec.assign(ssl::error_enum::assign_pub_key, ssl::error_instance);
+                X509_NAME_free(_subject);
+                return ec;
+            }
+
+            // Set subject field if the field is not empty in the parameters
+            if(!subject.country_name.empty())           X509_NAME_add_entry_by_txt(_subject, "C", MBSTRING_ASC, (const unsigned char*)subject.country_name.c_str(), -1, -1, 0);
+            if(!subject.state_name.empty())             X509_NAME_add_entry_by_txt(_subject, "S", MBSTRING_ASC, (const unsigned char*)subject.state_name.c_str(), -1, -1, 0);
+            if(!subject.locality_name.empty())          X509_NAME_add_entry_by_txt(_subject, "L", MBSTRING_ASC, (const unsigned char*)subject.locality_name.c_str(), -1, -1, 0);
+            if(!subject.organisation_name.empty())      X509_NAME_add_entry_by_txt(_subject, "O", MBSTRING_ASC, (const unsigned char*)subject.organisation_name.c_str(), -1, -1, 0);
+            if(!subject.organisation_unit_name.empty()) X509_NAME_add_entry_by_txt(_subject, "OU", MBSTRING_ASC, (const unsigned char*)subject.organisation_unit_name.c_str(), -1, -1, 0);
+            if(!subject.common_name.empty())            X509_NAME_add_entry_by_txt(_subject, "CN", MBSTRING_ASC, (const unsigned char*)subject.common_name.c_str(), -1, -1, 0);
+            if(!subject.email.empty())                  X509_NAME_add_entry_by_txt(_subject, "E", MBSTRING_ASC, (const unsigned char*)subject.email.c_str(), -1, -1, 0);
+
+            success = X509_REQ_set_subject_name(_csr, _subject);
+            if (!success)
+            {
+                ec.assign(ssl::error_enum::set_subject_name, ssl::error_instance);
+                X509_NAME_free(_subject);
                 return ec;
             }
 
@@ -94,6 +122,7 @@ namespace ssl
             if (!success)
             {
                 ec.assign(ssl::error_enum::sign_request, ssl::error_instance);
+                X509_NAME_free(_subject);
                 return ec;
             }
 

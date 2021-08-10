@@ -26,6 +26,17 @@ namespace ssl {
     constexpr std::chrono::seconds valid_30_days = valid_1_day * 30;
     constexpr std::chrono::seconds valid_1_year = valid_1_day * 365;
 
+    struct certificate_subject
+    {
+        std::string country_name;           // "C"
+        std::string state_name;             // "S"
+        std::string locality_name;          // "L"
+        std::string organisation_name;      // "O"
+        std::string organisation_unit_name; // "OU"
+        std::string common_name;            // "CN"
+        std::string email;                  // "E"
+    };
+
     enum error_enum : int
     {
         none = 0,
@@ -39,8 +50,10 @@ namespace ssl {
 
         read_signing_request,
         write_signing_request,
+        alloc_subject_struct,
         alloc_signing_struct,
         assign_pub_key,
+        set_subject_name,
         sign_request,
 
         read_certificate,
@@ -50,6 +63,7 @@ namespace ssl {
         get_request_key,
         set_public_key,
         copy_parameters,
+        copy_subject_name,
         sign_certificate
     };
     struct error_category : std::error_category
@@ -80,10 +94,14 @@ namespace ssl {
                 return "Failed to read certificate signing request from file";
             case ssl::error_enum::write_signing_request:
                 return "Failed to write certificate signing request to file";
+            case ssl::error_enum::alloc_subject_struct:
+                return "Failed to allocate memory for the subject name";
             case ssl::error_enum::alloc_signing_struct:
                 return "Failed to allocate memory for the signing request";
             case ssl::error_enum::assign_pub_key:
                 return "Failed to assign public key";
+            case ssl::error_enum::set_subject_name:
+                return "Failed to set subject name";
             case ssl::error_enum::sign_request:
                 return "Failed to create certificate reqeust";
 
@@ -101,6 +119,8 @@ namespace ssl {
                 return "Failed to set the certificate's public key";
             case ssl::error_enum::copy_parameters:
                 return "Failed to copy CA key's parameters";
+            case ssl::error_enum::copy_subject_name:
+                return "Failed to copy certificate's subject name";
             case ssl::error_enum::sign_certificate:
                 return "Failed to sign the certificate";
 
@@ -112,13 +132,13 @@ namespace ssl {
     inline static error_category error_instance;
 
     [[deprecated ("Wait for proper C++ implementation, this is using the openssl executable directly") ]]
-    std::error_code& generate_dhparams(const std::string& filename, int length_bits, std::error_code& ec)
+    std::error_code& generate_dhparams(const std::string& filename, int length_bits, int generator_number, std::error_code& ec)
     {
 // preprocessor directive to choose generating mode
 // if 0: use openssl dhparam command with std::system
 // if 1: use c code to generate the dh parameters
 #if 0
-        /*DH* dh;
+        DH* dh;
         BN_GENCB* cb;
         bool success;
 
@@ -126,11 +146,10 @@ namespace ssl {
         if(!cb) {}
         dh = DH_new();
         if(!dh) {}
-        success = DH_generate_parameters_ex(dh, length_bits, generator, cb);
+        success = DH_generate_parameters_ex(dh, length_bits, generator_number, cb);
         if(!success) {}
 
         BN_GENCB_free(cb);
-        app_RAND_write_file(NULL);*/
 #else
         std::stringstream commandbuffer;
         commandbuffer << "openssl dhparam -out " << filename << " " << length_bits;

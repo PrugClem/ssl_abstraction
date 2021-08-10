@@ -53,8 +53,8 @@ int main()
         std::cout << "ssl_context.set_password_callback(): " << ec.message() << std::endl;
         
         // temporary diffie-hellman parameters for keyexchange
-        ssl_context.use_tmp_dh_file("crt/dh4096.pem", ec);
-        std::cout << "ssl_context.use_tmp_dh_file(): " << ec.message() << std::endl;
+        //ssl_context.use_tmp_dh_file("crt/dh4096.pem", ec);
+        //std::cout << "ssl_context.use_tmp_dh_file(): " << ec.message() << std::endl;
 
         // root certificate to verify client certificate
         ssl_context.load_verify_file("crt/root.crt", ec);

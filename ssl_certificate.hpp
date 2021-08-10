@@ -127,6 +127,12 @@ namespace ssl
                 ec.assign(ssl::error_enum::copy_parameters, ssl::error_instance);
                 goto CLEANUP; // goto end of function to reduce the amount of code present
             }*/
+            success = X509_set_subject_name(_crt, X509_REQ_get_subject_name(sign_request.native_handle()));
+            if (!success)
+            {
+                ec.assign(ssl::error_enum::copy_subject_name, ssl::error_instance);
+                goto CLEANUP;
+            }
 
             X509_set_issuer_name(_crt, X509_get_subject_name(ca_cert.native_handle()));
 
