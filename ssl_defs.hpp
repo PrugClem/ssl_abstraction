@@ -14,6 +14,7 @@
 #include <system_error>     // error handling
 #include <chrono>           // certificate validity time
 #include <sstream>          // stringstream to generate command line commands
+#include <functional>       // dh generator callback function type
 
 #include <openssl/pem.h>    // file IO operations
 #include <openssl/x509.h>   // certificate handling
@@ -64,7 +65,11 @@ namespace ssl {
         set_public_key,
         copy_parameters,
         copy_subject_name,
-        sign_certificate
+        sign_certificate,
+
+        alloc_gencb,
+        alloc_dh,
+        generate_dhparam
     };
     struct error_category : std::error_category
     {
@@ -124,6 +129,13 @@ namespace ssl {
             case ssl::error_enum::sign_certificate:
                 return "Failed to sign the certificate";
 
+            case ssl::error_enum::alloc_gencb:
+                return "Failed to allocate memory for the Generator structure";
+            case ssl::error_enum::alloc_dh:
+                return "Failed to allocate memory for the dhparam structure";
+            case ssl::error_enum::generate_dhparam:
+                return "Failed to generate DH Parameters";
+
             default:
                 return "Unknown error";
             }
@@ -131,24 +143,50 @@ namespace ssl {
     }; // struct error_category
     inline static error_category error_instance;
 
-    [[deprecated ("Wait for proper C++ implementation, this is using the openssl executable directly") ]]
-    std::error_code& generate_dhparams(const std::string& filename, int length_bits, int generator_number, std::error_code& ec)
+    using dh_generator_callback = void(*)(int, int, void*);
+
+    [[deprecated ("Wait for proper C++ implementation, this is using C-style function pointers") ]]
+    std::error_code& generate_dhparams(const std::string& filename, int length_bits, int generator_number, ssl::dh_generator_callback callback, void* arg, std::error_code& ec)
     {
 // preprocessor directive to choose generating mode
 // if 0: use openssl dhparam command with std::system
 // if 1: use c code to generate the dh parameters
-#if 0
+#if 1
         DH* dh;
         BN_GENCB* cb;
         bool success;
+        FILE *file;
 
         cb = BN_GENCB_new();
-        if(!cb) {}
+        if(!cb)
+        {
+            ec.assign(ssl::error_enum::alloc_gencb, ssl::error_instance);
+            BN_GENCB_free(cb);
+        }
+        BN_GENCB_set_old(cb, callback, arg );
         dh = DH_new();
-        if(!dh) {}
+        if(!dh)
+        {
+            ec.assign(ssl::error_enum::alloc_dh, ssl::error_instance);
+            BN_GENCB_free(cb);
+        }
         success = DH_generate_parameters_ex(dh, length_bits, generator_number, cb);
-        if(!success) {}
+        if(!success)
+        {
+            ec.assign(ssl::error_enum::generate_dhparam, ssl::error_instance);
+            BN_GENCB_free(cb);
+        }
+        file = ::fopen(filename.c_str(), "wb");
+        if(!file)
+        {
+            ec.assign(ssl::error_enum::fopen, ssl::error_instance);
+            fclose(file);
+            BN_GENCB_free(cb);
+        }
 
+        PEM_write_DHparams(file, dh);
+
+        fclose(file);
         BN_GENCB_free(cb);
 #else
         std::stringstream commandbuffer;

@@ -10,8 +10,11 @@
 */
 
 #include <iostream>
+#include <thread>
 
 #include "ssl_abstraction.hpp"
+
+void dh_gen_callback(int, int, void*);
 
 int main()
 {
@@ -70,7 +73,8 @@ int main()
     client_crt.create_from_request(root_key, root_crt, client_csr, ssl::valid_now, ssl::valid_1_year, ec);
     std::cout << "client.crt.generate_from_request(): " << ec.message() << std::endl; if (ec) { return -1; }
 
-    //ssl::generate_dhparams("crt/dh4096.pem", 4096, 2, ec);
+    ssl::generate_dhparams("crt/dh4096.pem", 2048, 2, dh_gen_callback, nullptr, ec);
+    std::cout << "ssl::generate_dhparams(): " << ec.message() << std::endl; if (ec) { return -1; }
 
     // write keys and certificates to the respective files
     server_key.write_to_file("crt/server.key", ec);
@@ -93,4 +97,16 @@ int main()
 
     std::cout << "Done running program" << std::endl;
     return 0;
+}
+
+void dh_gen_callback(int p, int n, void* arg)
+{
+    if(p == 0)
+        std::cout << '.';
+    else if(p == 1)
+        std::cout << '+';
+    else if(p == 2)
+        std::cout << '*';
+    else if(p == 3)
+        std::cout << '\n';
 }
