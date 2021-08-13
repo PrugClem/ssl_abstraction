@@ -18,6 +18,7 @@ namespace ssl
     class key_pair
     {
     public:
+        // native handle is used in order to make the code more readable
         using native_handle_t = EVP_PKEY*;
     private:
         native_handle_t _key{ nullptr };
@@ -33,7 +34,17 @@ namespace ssl
         {
             if (_key != nullptr) { EVP_PKEY_free(_key); _key = nullptr; } // only free the memory if it needs to be free'd
         }
+        /**
+         * @brief get the native OpenSSL handle for the EVP_PKEY
+         */
         native_handle_t native_handle() { return _key; }
+        /**
+         * @brief read a private key from the filesystem. the key is stored in the calling object
+         * 
+         * @param filename the location of the key in a pem file
+         * @param ec error code to write errors to
+         * @return the returned reference refers to the provided std::error_code
+         */
         std::error_code& read_from_file(const std::string& filename, std::error_code& ec)
         {
             FILE* file = ::fopen(filename.c_str(), "rb"); // open file to read from
@@ -53,6 +64,13 @@ namespace ssl
             fclose(file);
             return ec;
         }
+        /**
+         * @brief write a key pair into a file in the filesystem. the key stored in the calling object is written.
+         * 
+         * @param filename the filename to write the key pair to
+         * @param ec error code to write errors to
+         * @return the returned reference refers to the provided std::error_code
+         */
         std::error_code& write_to_file(const std::string& filename, std::error_code& ec)
         {
             FILE* file = ::fopen(filename.c_str(), "wb"); // open file to export private key
@@ -72,7 +90,14 @@ namespace ssl
             fclose(file);
             return ec;
         }
-        std::error_code& generate(int keylength_bits, std::error_code& ec)
+        /**
+         * @brief generate a key pair for RSA asymetric encryption
+         * 
+         * @param keylength_bits the length of the RSA key in bits
+         * @param ec error code to write errors to
+         * @return the returned reference refers to the provided std::error_code
+         */
+        std::error_code& generate_rsa(int keylength_bits, std::error_code& ec)
         {
             BIGNUM* bne{ nullptr };
             RSA* _rsa{ nullptr };
@@ -87,8 +112,6 @@ namespace ssl
                 return ec;
             }
 
-            // deprecated code
-            //_rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
             bne = BN_new();
             ret = BN_set_word(bne, 65537); // set RSA key exponent
             if (ret != 1)

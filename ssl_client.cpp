@@ -14,6 +14,7 @@
 #include <asio.hpp>
 #include <asio/ssl.hpp>
 
+// This function just prints the ertificate's subject name
 bool verify_certificate_callback(bool preverified, asio::ssl::verify_context& verify_context)
 {
     // this function just prints the subject string of the certificate

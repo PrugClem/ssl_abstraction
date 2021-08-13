@@ -11,16 +11,18 @@
 
 #include <iostream>
 #include <thread>
+#include <string.h>
 
 #include "ssl_abstraction.hpp"
 
-void dh_gen_callback(int, int, void*);
+void dh_gen_callback(int, int, char*, const size_t);
 
 int main()
 {
-    ssl::error_category test;
-    ssl::error_enum test2;
-    
+    constexpr size_t backlog_len = 127;
+    char backlog_data[backlog_len + 1];
+    memset(backlog_data, 0, sizeof(backlog_data));
+
     std::error_code ec;
     ssl::key_pair root_key, server_key, client_key;
     ssl::crt_signing_request server_csr, client_csr;
@@ -34,18 +36,6 @@ int main()
     server_subject.common_name = "server certificate";
     client_subject.common_name = "client certificate";
 
-    /*key.generate(2048, ec);
-    std::cout << "key.generate(): " << ec.message() << std::endl;
-
-    key.write_to_file("crt/test.key", ec);
-    std::cout << "key.write_to_file(): " << ec.message() << std::endl;
-
-    copy.read_from_file("crt/root.key", ec);
-    std::cout << "key.read_from_file(): " << ec.message() << std::endl;
-
-    copy.write_to_file("crt/root_copy.key", ec);
-    std::cout << "key.write_to_file(): " << ec.message() << std::endl;*/
-
     // read root key from file
     root_key.read_from_file("crt/root.key", ec);
     std::cout << "root_key.read_from_file(): " << ec.message() << std::endl; if (ec) { return -1; }
@@ -54,7 +44,7 @@ int main()
     std::cout << "root_crt.read_from_file(): " << ec.message() << std::endl;  if (ec) { return -1; }
 
     // generate the server's key and certificate
-    server_key.generate(2048, ec);
+    server_key.generate_rsa(2048, ec);
     std::cout << "server_key.generate(): " << ec.message() << std::endl; if (ec) { return -1; }
 
     server_csr.create(server_key, server_subject, ec);
@@ -64,7 +54,7 @@ int main()
     std::cout << "server_crt.generate_from_request(): " << ec.message() << std::endl; if (ec) { return -1; }
 
     // generate the client's key and certificate
-    client_key.generate(2048, ec);
+    client_key.generate_rsa(2048, ec);
     std::cout << "client_key.generate(): " << ec.message() << std::endl; if (ec) { return -1; }
 
     client_csr.create(client_key, client_subject, ec);
@@ -73,7 +63,8 @@ int main()
     client_crt.create_from_request(root_key, root_crt, client_csr, ssl::valid_now, ssl::valid_1_year, ec);
     std::cout << "client.crt.generate_from_request(): " << ec.message() << std::endl; if (ec) { return -1; }
 
-    ssl::generate_dhparams("crt/dh4096.pem", 2048, 2, dh_gen_callback, nullptr, ec);
+    // generate Diffie Hellman Parameters for key-exchange
+    ssl::generate_dhparams("crt/dh4096.pem", 4096, 2, std::bind(dh_gen_callback, std::placeholders::_1, std::placeholders::_2, backlog_data, backlog_len), ec);
     std::cout << "ssl::generate_dhparams(): " << ec.message() << std::endl; if (ec) { return -1; }
 
     // write keys and certificates to the respective files
@@ -99,14 +90,37 @@ int main()
     return 0;
 }
 
-void dh_gen_callback(int p, int n, void* arg)
+void buffer_push_back(char* buffer, const size_t bufferlen, char data)
 {
+    size_t last = std::min(bufferlen-1, strlen(buffer));
+    if(last == bufferlen-1)
+        for (size_t i = 1; i < last; i++)
+        {
+            buffer[i - 1] = buffer[i];
+        }
+    buffer[last] = data;
+}
+
+void print_buffer(char* buffer, const size_t bufferlen, std::ostream& output)
+{
+    for(size_t i=0; i<bufferlen; i++)
+    {
+        output << buffer[i];
+    }
+}
+
+void dh_gen_callback(int p, int n, char* backlog_data, const size_t backlog_len)
+{
+    char c = '\0';
     if(p == 0)
-        std::cout << '.';
+        c = '.';
     else if(p == 1)
-        std::cout << '+';
+        c = '+';
     else if(p == 2)
-        std::cout << '*';
+        c = '*';
     else if(p == 3)
-        std::cout << '\n';
+        c = '\n';
+    if(c != '\0') buffer_push_back(backlog_data, backlog_len, c);
+    std::cout << "n: " << n << " Backlog: " << backlog_data << "\r";
+    std::cout.flush();
 }

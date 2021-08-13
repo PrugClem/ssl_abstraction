@@ -27,6 +27,10 @@ namespace ssl {
     constexpr std::chrono::seconds valid_30_days = valid_1_day * 30;
     constexpr std::chrono::seconds valid_1_year = valid_1_day * 365;
 
+    /**
+     * @brief stores information about a certificate, eg Counter, Organisation, etc
+     * 
+     */
     struct certificate_subject
     {
         std::string country_name;           // "C"
@@ -38,6 +42,10 @@ namespace ssl {
         std::string email;                  // "E"
     };
 
+    /**
+     * @brief error codes for the ssl abstraction library
+     * 
+     */
     enum error_enum : int
     {
         none = 0,
@@ -69,8 +77,13 @@ namespace ssl {
 
         alloc_gencb,
         alloc_dh,
-        generate_dhparam
+        generate_dhparam,
+        write_dhparam
     };
+    /**
+     * @brief error category has to be inherited in order to allow std::error_code decode the integer from the enum
+     * 
+     */
     struct error_category : std::error_category
     {
         const char* name() const noexcept
@@ -135,23 +148,29 @@ namespace ssl {
                 return "Failed to allocate memory for the dhparam structure";
             case ssl::error_enum::generate_dhparam:
                 return "Failed to generate DH Parameters";
+            case ssl::error_enum::write_dhparam:
+                return "Failed to write DH parameters to file";
 
             default:
                 return "Unknown error";
             }
         }
     }; // struct error_category
+    // instance for the std::error_code
     inline static error_category error_instance;
 
-    using dh_generator_callback = void(*)(int, int, void*);
-
-    [[deprecated ("Wait for proper C++ implementation, this is using C-style function pointers") ]]
-    std::error_code& generate_dhparams(const std::string& filename, int length_bits, int generator_number, ssl::dh_generator_callback callback, void* arg, std::error_code& ec)
+    /**
+     * @brief generate diffie-hellmann parameters for a DH-key exchange and write the output to a file
+     * 
+     * @param filename the filename the output should be written to
+     * @param length_bits length of the prime number, it is recommended that this number is some power of 2
+     * @param generator_number it is recommended to use 2 or 5 for this number
+     * @param callback function to let the program know that the process is running and hasn't died yet
+     * @param ec error code to write errors to
+     * @return the returned reference refers to the provided std::error_code
+     */
+    std::error_code& generate_dhparams(const std::string& filename, int length_bits, int generator_number, std::function<void(int, int)> callback, std::error_code& ec)
     {
-// preprocessor directive to choose generating mode
-// if 0: use openssl dhparam command with std::system
-// if 1: use c code to generate the dh parameters
-#if 1
         DH* dh;
         BN_GENCB* cb;
         bool success;
@@ -162,19 +181,27 @@ namespace ssl {
         {
             ec.assign(ssl::error_enum::alloc_gencb, ssl::error_instance);
             BN_GENCB_free(cb);
+            return ec;
         }
-        BN_GENCB_set_old(cb, callback, arg );
+        BN_GENCB_set_old(cb, [](int p, int n, void* std_function)
+            {
+                // get the function pointer back from the parameter and invoke the function
+                std::function<void(int, int)> callback = *(std::function<void(int, int)>*)std_function;
+                callback(p, n);
+            }, &callback);
         dh = DH_new();
         if(!dh)
         {
             ec.assign(ssl::error_enum::alloc_dh, ssl::error_instance);
             BN_GENCB_free(cb);
+            return ec;
         }
         success = DH_generate_parameters_ex(dh, length_bits, generator_number, cb);
         if(!success)
         {
             ec.assign(ssl::error_enum::generate_dhparam, ssl::error_instance);
             BN_GENCB_free(cb);
+            return ec;
         }
         file = ::fopen(filename.c_str(), "wb");
         if(!file)
@@ -182,17 +209,19 @@ namespace ssl {
             ec.assign(ssl::error_enum::fopen, ssl::error_instance);
             fclose(file);
             BN_GENCB_free(cb);
+            return ec;
         }
 
-        PEM_write_DHparams(file, dh);
-
+        success = PEM_write_DHparams(file, dh);
+        if (!success)
+        {
+            ec.assign(ssl::error_enum::write_dhparam, ssl::error_instance);
+            fclose(file);
+            BN_GENCB_free(cb);
+            return ec;
+        }
         fclose(file);
         BN_GENCB_free(cb);
-#else
-        std::stringstream commandbuffer;
-        commandbuffer << "openssl dhparam -out " << filename << " " << length_bits;
-        std::system(commandbuffer.str().c_str());
-#endif
         return ec;
     }
 } // namespace ssl
