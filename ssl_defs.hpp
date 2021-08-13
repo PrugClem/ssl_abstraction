@@ -159,17 +159,26 @@ namespace ssl {
     // instance for the std::error_code
     inline static error_category error_instance;
 
+    enum dh_callback_information : int
+    {
+        // the information about those number is taken from https://security.stackexchange.com/questions/42046/what-do-the-dots-and-pluses-mean-when-openssl-generates-keys
+        potential_prime_number = 0, // a potential prime number has been generated
+        number_is_tested = 1,       // one iteration of the Miller-Rabin primality test has passed
+        prime_number_found = 2,     // a prime number is found
+        dh_param_finished = 3       // the generation of the DH parameters is finished
+    };
+
     /**
      * @brief generate diffie-hellmann parameters for a DH-key exchange and write the output to a file
      * 
      * @param filename the filename the output should be written to
      * @param length_bits length of the prime number, it is recommended that this number is some power of 2
-     * @param generator_number it is recommended to use 2 or 5 for this number
+     * @param generator_number it is recommended to use 2, 3 or 5 for this number, OpenSSL's CLI default is 2
      * @param callback function to let the program know that the process is running and hasn't died yet
      * @param ec error code to write errors to
      * @return the returned reference refers to the provided std::error_code
      */
-    std::error_code& generate_dhparams(const std::string& filename, int length_bits, int generator_number, std::function<void(int, int)> callback, std::error_code& ec)
+    std::error_code& generate_dhparams(const std::string& filename, int length_bits, int generator_number, std::function<void(ssl::dh_callback_information, int)> callback, std::error_code& ec)
     {
         DH* dh;
         BN_GENCB* cb;
@@ -186,8 +195,8 @@ namespace ssl {
         BN_GENCB_set_old(cb, [](int p, int n, void* std_function)
             {
                 // get the function pointer back from the parameter and invoke the function
-                std::function<void(int, int)> callback = *(std::function<void(int, int)>*)std_function;
-                callback(p, n);
+                std::function<void(dh_callback_information, int)> callback = *(std::function<void(dh_callback_information, int)>*)std_function;
+                callback(dh_callback_information(p), n );
             }, &callback);
         dh = DH_new();
         if(!dh)

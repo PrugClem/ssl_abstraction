@@ -15,7 +15,7 @@
 
 #include "ssl_abstraction.hpp"
 
-void dh_gen_callback(int, int, char*, const size_t);
+void dh_gen_callback(ssl::dh_callback_information, int, char*, const size_t);
 
 int main()
 {
@@ -109,16 +109,16 @@ void print_buffer(char* buffer, const size_t bufferlen, std::ostream& output)
     }
 }
 
-void dh_gen_callback(int p, int n, char* backlog_data, const size_t backlog_len)
+void dh_gen_callback(ssl::dh_callback_information p, int n, char* backlog_data, const size_t backlog_len)
 {
     char c = '\0';
-    if(p == 0)
+    if(p == ssl::dh_callback_information::potential_prime_number)
         c = '.';
-    else if(p == 1)
+    else if(p == ssl::dh_callback_information::number_is_tested)
         c = '+';
-    else if(p == 2)
+    else if(p == ssl::dh_callback_information::prime_number_found)
         c = '*';
-    else if(p == 3)
+    else if (p == ssl::dh_callback_information::dh_param_finished)
         c = '\n';
     if(c != '\0') buffer_push_back(backlog_data, backlog_len, c);
     std::cout << "n: " << n << " Backlog: " << backlog_data << "\r";
